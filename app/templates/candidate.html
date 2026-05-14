@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Candidate | inHire</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-950">
+  <nav class="border-b bg-white">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <div><span class="text-xl font-black">inHire</span><span class="ml-3 text-slate-500">Candidate Interview</span></div>
+      <form action="/logout" method="post"><button class="rounded-lg bg-slate-950 px-4 py-2 text-white">Logout</button></form>
+    </div>
+  </nav>
+  <main class="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-3">
+    <section class="lg:col-span-2 rounded-3xl bg-white p-6 shadow">
+      <h1 class="text-3xl font-black">Hello, {{ user.name }}</h1>
+      <p class="mt-2 text-slate-600">Enter the department, candidate level, and HR access code. Only matching assessments are shown, so Software, Medical, Intern, Mid, Senior, and Executive tests do not mix.</p>
+      {% if not assessment %}
+      <form action="/candidate" method="get" class="mt-6 grid gap-3 rounded-2xl bg-slate-50 p-5 md:grid-cols-4">
+        <select class="rounded-xl border p-3" name="department" required>
+          <option value="">Department</option>
+          <option value="Software" {% if department == "Software" %}selected{% endif %}>Software</option>
+          <option value="Medical" {% if department == "Medical" %}selected{% endif %}>Medical</option>
+        </select>
+        <select class="rounded-xl border p-3" name="candidate_level" required>
+          <option value="">Level</option>
+          <option value="intern" {% if candidate_level == "intern" %}selected{% endif %}>Intern</option>
+          <option value="junior" {% if candidate_level == "junior" %}selected{% endif %}>Junior</option>
+          <option value="mid" {% if candidate_level == "mid" %}selected{% endif %}>Mid-level</option>
+          <option value="senior" {% if candidate_level == "senior" %}selected{% endif %}>Senior</option>
+          <option value="executive" {% if candidate_level == "executive" %}selected{% endif %}>Executive</option>
+        </select>
+        <input class="rounded-xl border p-3" name="access_code" placeholder="HR access code" value="{{ access_code }}" required>
+        <button class="rounded-xl bg-slate-950 px-5 py-3 font-black text-white">Find My Test</button>
+      </form>
+      {% if department and candidate_level and access_code and not templates %}
+      <div class="mt-6 rounded-2xl bg-amber-100 p-5 text-amber-900">No assessment matched your department, level, and access code. Check the code HR gave you.</div>
+      {% endif %}
+      {% if templates %}
+      <form action="/candidate/technical" method="post" class="mt-6 space-y-5">
+        <input type="hidden" name="department" value="{{ department }}">
+        <input type="hidden" name="candidate_level" value="{{ candidate_level }}">
+        <input type="hidden" name="access_code" value="{{ access_code }}">
+        <label class="block text-sm font-bold text-slate-700">Assessment template</label>
+        <select id="templatePicker" class="w-full rounded-xl border p-3" name="template_id" required>
+          {% for template in templates %}
+          <option value="{{ template.id }}">{{ template.name }} - {{ template.department }} / {{ template.target_role }}</option>
+          {% endfor %}
+        </select>
+        {% for template in templates %}
+        <div class="question-set space-y-4 rounded-2xl border p-5" data-template="{{ template.id }}" {% if not loop.first %}style="display:none"{% endif %}>
+          <div>
+            <div class="text-sm font-bold text-cyan-700">{{ template.department }}</div>
+            <h2 class="text-2xl font-black">{{ template.target_role }}</h2>
+            <p class="mt-2 rounded-xl bg-cyan-50 p-4 text-slate-700"><span class="font-bold">HR instructions:</span> {{ template.global_instructions }}</p>
+          </div>
+          {% for q in template.questions|sort(attribute='sort_order') %}
+          {% if q.round_type == 'text' and q.question_type == 'theory' %}
+          <label class="block">
+            <span class="font-bold">Question {{ loop.index }}</span>
+            <span class="mt-1 block text-slate-700">{{ q.prompt }}</span>
+            <textarea class="mt-2 h-36 w-full rounded-xl border p-3" name="answer_{{ q.id }}" placeholder="Type your answer here"></textarea>
+          </label>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endfor %}
+        <button class="rounded-xl bg-cyan-500 px-6 py-3 font-black text-white">Submit Round 1</button>
+      </form>
+      {% endif %}
+      {% elif assessment.tech_status == "failed_tech" %}
+      <div class="mt-6 rounded-2xl bg-red-100 p-5 text-red-900">You scored {{ assessment.tech_ai_suggested_score }}/100. The 60% gate was not met, so this assessment is locked.</div>
+      {% if assessment.retry_allowed %}
+      <div class="mt-4 rounded-2xl bg-amber-100 p-5 text-amber-900">HR allowed a retry. Please contact HR to reset your attempt.</div>
+      {% endif %}
+      {% else %}
+      <div class="mt-6 rounded-2xl bg-emerald-100 p-5 text-emerald-900">Initial Gemini evaluation is complete. Theory score: {{ assessment.tech_ai_suggested_score }}/100. HR review controls the next unlock.</div>
+      {% if assessment.answers %}
+      <details class="mt-4 rounded-2xl border p-5">
+        <summary class="cursor-pointer font-black">Your question-by-question Gemini results</summary>
+        <div class="mt-4 space-y-3">
+          {% for answer in assessment.answers %}
+          <div class="rounded-xl bg-slate-50 p-4"><div class="font-bold">{{ answer.question.prompt }}</div><div class="mt-1 text-slate-700">{{ answer.answer_text }}</div><div class="mt-2 text-cyan-700">Score {{ answer.ai_score }}/100 - {{ answer.ai_reasoning }}</div></div>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% if assessment.coding_status == "unlocked" %}
+      <form action="/candidate/coding" method="post" class="mt-6 rounded-2xl border p-5">
+        <h2 class="text-2xl font-black">Software Coding Round</h2>
+        <p class="mt-2 text-slate-600">Solve inside this portal. Do not copy/paste screenshots. Gemini evaluates your submitted code/answer against HR expected output and rubric.</p>
+        {% for question in coding_questions %}
+        <label class="mt-4 block">
+          <span class="font-bold">{{ question.prompt }}</span>
+          {% if question.instructions %}<span class="block text-sm text-slate-500">{{ question.instructions }}</span>{% endif %}
+          <textarea class="mt-2 h-56 w-full rounded-xl border bg-slate-950 p-3 font-mono text-sm text-emerald-200" name="answer_{{ question.id }}" spellcheck="false" onpaste="return false" placeholder="Write your Python/code solution here"></textarea>
+        </label>
+        {% endfor %}
+        <button class="mt-4 rounded-xl bg-slate-950 px-6 py-3 font-black text-white">Submit Coding Round</button>
+      </form>
+      {% elif assessment.coding_status == "failed_coding" %}
+      <div class="mt-6 rounded-2xl bg-red-100 p-5 text-red-900">Coding round failed with Gemini suggested score {{ assessment.coding_ai_suggested_score }}/100. HR can allow retry.</div>
+      {% elif assessment.coding_status == "passed_coding_pending_hr" %}
+      <div class="mt-6 rounded-2xl bg-amber-100 p-5 text-amber-900">Coding submitted. Gemini suggested score: {{ assessment.coding_ai_suggested_score }}/100. HR evaluation is in process before video unlock.</div>
+      {% endif %}
+      {% if assessment.behavioral_status == "pending_hr_unlock" %}
+      <div class="mt-6 rounded-2xl bg-slate-100 p-5 text-slate-800">Next round is locked while HR reviews your results. You will be notified when HR unlocks it.</div>
+      {% endif %}
+      {% if assessment.behavioral_status == "unlocked" %}
+      <div class="mt-6 rounded-2xl border p-5">
+        <h2 class="text-2xl font-black">Round 2: AI Behavioral Video Interview</h2>
+        <div class="mt-3 space-y-2 text-slate-700">
+          {% for question in video_questions %}
+          <p><span class="font-bold">Prompt:</span> {{ question.prompt }}</p>
+          {% endfor %}
+        </div>
+        <video id="preview" class="mt-4 w-full rounded-xl bg-black" autoplay muted playsinline></video>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <button id="start" class="rounded-xl bg-slate-950 px-5 py-3 text-white" type="button">Start recording</button>
+          <button id="stop" class="rounded-xl bg-red-600 px-5 py-3 text-white" type="button" disabled>Stop and submit</button>
+        </div>
+        <form id="videoForm" action="/candidate/video" method="post" enctype="multipart/form-data" class="hidden"><input id="videoFile" name="file" type="file"></form>
+      </div>
+      {% elif assessment.behavioral_status == "completed" %}
+      <div class="mt-6 rounded-2xl bg-cyan-100 p-5 text-cyan-900">Video submitted. Gemini behavioral suggested score: {{ assessment.behavioral_ai_suggested_score }}/100. HR will review, edit score if needed, and make the final job decision.</div>
+      {% endif %}
+      {% endif %}
+    </section>
+    <aside class="rounded-3xl bg-white p-6 shadow">
+      <h2 class="text-xl font-black">Status</h2>
+      <dl class="mt-4 space-y-3 text-sm">
+        <div><dt class="text-slate-500">Template</dt><dd class="font-bold">{{ assessment.template.name if assessment and assessment.template else "Not selected" }}</dd></div>
+        <div><dt class="text-slate-500">Technical</dt><dd class="font-bold">{{ assessment.tech_status if assessment else "not_started" }}</dd></div>
+        <div><dt class="text-slate-500">Coding</dt><dd class="font-bold">{{ assessment.coding_status if assessment else "locked" }}</dd></div>
+        <div><dt class="text-slate-500">Behavioral</dt><dd class="font-bold">{{ assessment.behavioral_status if assessment else "locked" }}</dd></div>
+        <div><dt class="text-slate-500">Final approval</dt><dd class="font-bold">{{ "Approved" if assessment and assessment.is_finally_approved else "Pending/Rejected" }}</dd></div>
+      </dl>
+    </aside>
+  </main>
+  <script>
+    const picker = document.getElementById('templatePicker');
+    if (picker) {
+      picker.addEventListener('change', () => {
+        document.querySelectorAll('.question-set').forEach(set => set.style.display = set.dataset.template === picker.value ? 'block' : 'none');
+      });
+    }
+    let recorder, chunks = [];
+    const start = document.getElementById('start');
+    const stop = document.getElementById('stop');
+    const preview = document.getElementById('preview');
+    if (start) {
+      start.onclick = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        preview.srcObject = stream;
+        chunks = [];
+        recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        recorder.ondataavailable = event => chunks.push(event.data);
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const file = new File([blob], 'behavioral-response.webm', { type: 'video/webm' });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          document.getElementById('videoFile').files = dt.files;
+          document.getElementById('videoForm').submit();
+        };
+        recorder.start();
+        start.disabled = true;
+        stop.disabled = false;
+      };
+      stop.onclick = () => {
+        recorder.stop();
+        preview.srcObject.getTracks().forEach(track => track.stop());
+      };
+    }
+  </script>
+</body>
+</html>

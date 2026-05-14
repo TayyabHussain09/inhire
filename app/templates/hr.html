@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HR Dashboard | inHire</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-950">
+  <nav class="border-b bg-white">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <div><span class="text-xl font-black">inHire</span><span class="ml-3 text-slate-500">HR Senior Dashboard</span></div>
+      <form action="/logout" method="post"><button class="rounded-lg bg-slate-950 px-4 py-2 text-white">Logout</button></form>
+    </div>
+  </nav>
+  <main class="mx-auto max-w-7xl space-y-8 px-6 py-8">
+    <section class="rounded-3xl bg-slate-950 p-6 text-white">
+      <h1 class="text-3xl font-black">Job Role Assessment Builder</h1>
+      <p class="mt-2 text-slate-300">Create Software or Medical department assessments with unlimited instructions, Round 1 questions, and Round 2 AI video interview prompts.</p>
+      <form action="/hr/templates" method="post" class="mt-6 grid gap-4 lg:grid-cols-2">
+        <input class="rounded-xl border border-white/10 bg-white/10 p-3" name="name" placeholder="Template name" required>
+        <select class="rounded-xl border border-white/10 bg-white/10 p-3" name="department" required>
+          <option value="Software">Software Department</option>
+          <option value="Medical">Medical Department</option>
+        </select>
+        <select class="rounded-xl border border-white/10 bg-white/10 p-3" name="candidate_level" required>
+          <option value="intern">Intern</option>
+          <option value="junior">Junior</option>
+          <option value="mid">Mid-level</option>
+          <option value="senior">Senior</option>
+          <option value="executive">Executive</option>
+        </select>
+        <input class="rounded-xl border border-white/10 bg-white/10 p-3" name="access_code" placeholder="Unique candidate access code, e.g. SW-INTERN-2026" required>
+        <input class="rounded-xl border border-white/10 bg-white/10 p-3 lg:col-span-2" name="target_role" placeholder="Target role, e.g. Backend Python Engineer" required>
+        <textarea class="rounded-xl border border-white/10 bg-white/10 p-3 lg:col-span-2" name="global_instructions" placeholder="Instructions for candidates and Gemini grading rules: how to solve, expected depth, required format, pass criteria." required></textarea>
+        <div class="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div class="flex items-center justify-between"><h3 class="font-black">Round 1 Theory Questions</h3><button class="add-row rounded-lg bg-white/10 px-3 py-1" type="button" data-target="theoryBox">+ Add</button></div>
+          <div id="theoryBox" class="mt-3 space-y-3"><input class="w-full rounded-xl border border-white/10 bg-white/10 p-3" name="theory_row" placeholder="Question || instructions || expected answer/rubric"></div>
+          <textarea id="text_questions" class="hidden" name="text_questions"></textarea>
+        </div>
+        <div class="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div class="flex items-center justify-between"><h3 class="font-black">Optional Software Coding Questions</h3><button class="add-row rounded-lg bg-white/10 px-3 py-1" type="button" data-target="codingBox">+ Add</button></div>
+          <div id="codingBox" class="mt-3 space-y-3"><input class="w-full rounded-xl border border-white/10 bg-white/10 p-3" name="coding_row" placeholder="Coding problem || constraints/instructions || expected output/test cases"></div>
+          <textarea id="coding_questions" class="hidden" name="coding_questions"></textarea>
+        </div>
+        <div class="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div class="flex items-center justify-between"><h3 class="font-black">Round 2 AI Video Interview Prompts</h3><button class="add-row rounded-lg bg-white/10 px-3 py-1" type="button" data-target="videoBox">+ Add</button></div>
+          <div id="videoBox" class="mt-3 space-y-3"><input class="w-full rounded-xl border border-white/10 bg-white/10 p-3" name="video_row" placeholder="Video prompt || evaluation guidance || ideal signals"></div>
+          <textarea id="video_questions" class="hidden" name="video_questions"></textarea>
+        </div>
+        <button class="rounded-xl bg-cyan-400 p-3 font-black text-slate-950 lg:col-span-2">Create Template</button>
+      </form>
+    </section>
+    <section class="grid gap-4 lg:grid-cols-3">
+      {% for template in templates %}
+      <article class="rounded-2xl bg-white p-5 shadow">
+        <div class="text-sm font-bold text-cyan-700">{{ template.department }}</div>
+        <h2 class="mt-1 text-xl font-black">{{ template.name }}</h2>
+        <p class="mt-1 text-slate-600">{{ template.target_role }}</p>
+        <p class="mt-2 text-sm"><span class="rounded-full bg-slate-100 px-2 py-1">{{ template.candidate_level|upper }}</span> <span class="rounded-full bg-cyan-50 px-2 py-1 text-cyan-700">{{ template.access_code }}</span></p>
+        <p class="mt-3 text-sm text-slate-500">{{ template.questions|length }} questions</p>
+      </article>
+      {% endfor %}
+    </section>
+    <section class="overflow-hidden rounded-3xl bg-white shadow">
+      <div class="border-b p-6"><h2 class="text-2xl font-black">Candidate Ranking and HR Final Approval</h2><p class="mt-1 text-slate-500">Gemini 2.5 Flash-Lite only suggests scores. HR can edit scores and is the only role allowed to approve or reject a job candidate.</p></div>
+      <table class="w-full text-left text-sm">
+        <thead class="bg-slate-200 text-slate-700"><tr><th class="p-4">Candidate</th><th class="p-4">Job Assessment</th><th class="p-4">Gemini Suggested Scores</th><th class="p-4">Behavioral Video</th><th class="p-4">HR Edit Score and Final Decision</th></tr></thead>
+        <tbody class="divide-y">
+          {% for c in candidates %}
+          <tr>
+            <td class="p-4"><div class="font-black">{{ c.name }}</div><div class="text-slate-500">{{ c.email }}</div><div class="mt-1 text-xs">Rank score: {{ c.composite_score if c.composite_score is not none else "N/A" }}</div></td>
+            <td class="p-4"><div>{{ c.template_name }}</div><div class="text-slate-500">{{ c.department }} / {{ c.candidate_level|upper }} / {{ c.target_role }}</div><div class="mt-1 text-xs text-cyan-700">Code: {{ c.access_code }}</div></td>
+            <td class="p-4">Theory: {{ c.tech_ai_score if c.tech_ai_score is not none else "N/A" }}<br>Coding: {{ c.coding_ai_score if c.coding_ai_score is not none else "N/A" }}<br>Behavioral: {{ c.behavioral_ai_score if c.behavioral_ai_score is not none else "N/A" }}</td>
+            <td class="p-4">{% if c.behavioral_video_url %}<a class="text-cyan-700 underline" href="{{ c.behavioral_video_url }}" target="_blank">View video</a>{% else %}No video{% endif %}</td>
+            <td class="p-4">
+              {% if c.assessment_id %}
+              <form action="/hr/assessment/{{ c.assessment_id }}/decision" method="post" class="grid gap-2">
+                <input class="rounded-lg border p-2" name="tech_human_final_score" type="number" min="0" max="100" step="0.1" placeholder="Tech final" value="{{ c.tech_final_score or '' }}">
+                <input class="rounded-lg border p-2" name="coding_human_final_score" type="number" min="0" max="100" step="0.1" placeholder="Coding final" value="{{ c.coding_final_score or '' }}">
+                <input class="rounded-lg border p-2" name="behavioral_human_final_score" type="number" min="0" max="100" step="0.1" placeholder="Behavioral final" value="{{ c.behavioral_final_score or '' }}">
+                <select class="rounded-lg border p-2" name="decision"><option value="approve" {% if c.is_finally_approved %}selected{% endif %}>Approve</option><option value="reject" {% if not c.is_finally_approved %}selected{% endif %}>Reject</option></select>
+                <button class="rounded-lg bg-slate-950 p-2 font-bold text-white">Save</button>
+              </form>
+              <form action="/hr/assessment/{{ c.assessment_id }}/retry" method="post" class="mt-2">
+                <input type="hidden" name="allow_retry" value="true">
+                <button class="w-full rounded-lg bg-amber-500 p-2 font-bold text-white">Allow Retry</button>
+              </form>
+              <form action="/hr/assessment/{{ c.assessment_id }}/unlock-video" method="post" class="mt-2">
+                <button class="w-full rounded-lg bg-emerald-600 p-2 font-bold text-white">Unlock Video Round</button>
+              </form>
+              <details class="mt-2 rounded-lg bg-slate-100 p-2" open>
+                <summary class="cursor-pointer font-bold">Answers, Gemini reasons, and audit logs</summary>
+                <div class="mt-2 space-y-2">
+                  {% for answer in c.answers %}
+                  <div class="rounded border bg-white p-2">
+                    <div class="font-bold">{{ answer.question.question_type|upper }}: {{ answer.question.prompt }}</div>
+                    <div class="mt-1 whitespace-pre-wrap text-slate-700">{{ answer.answer_text }}</div>
+                    <div class="mt-1 text-cyan-700">Gemini {{ answer.ai_score }}/100: {{ answer.ai_reasoning }}</div>
+                    <pre class="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 text-xs text-slate-600">{{ answer.ai_raw_response }}</pre>
+                  </div>
+                  {% endfor %}
+                  <pre class="whitespace-pre-wrap rounded bg-slate-950 p-3 text-xs text-white">{{ c.ai_log }}</pre>
+                  <pre class="whitespace-pre-wrap rounded bg-amber-100 p-3 text-xs text-amber-950">{{ c.proctoring_log }}</pre>
+                </div>
+              </details>
+              {% else %}Not started{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </main>
+  <script>
+    document.querySelectorAll('.add-row').forEach(button => {
+      button.addEventListener('click', () => {
+        const box = document.getElementById(button.dataset.target);
+        const input = box.querySelector('input').cloneNode();
+        input.value = '';
+        box.appendChild(input);
+      });
+    });
+    document.querySelector('form[action="/hr/templates"]').addEventListener('submit', (event) => {
+      const joinRows = (boxId) => Array.from(document.querySelectorAll(`#${boxId} input`)).map(i => i.value.trim()).filter(Boolean).join('\n');
+      const theoryQuestions = joinRows('theoryBox');
+      const videoQuestions = joinRows('videoBox');
+      if (!theoryQuestions || !videoQuestions) {
+        event.preventDefault();
+        alert('Please add at least one theory question and one video prompt before creating the template.');
+        return;
+      }
+      document.getElementById('text_questions').value = theoryQuestions;
+      document.getElementById('coding_questions').value = joinRows('codingBox');
+      document.getElementById('video_questions').value = videoQuestions;
+    });
+  </script>
+</body>
+</html>
